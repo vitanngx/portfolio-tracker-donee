@@ -1223,25 +1223,41 @@ Lãi/Lỗ ngay: ${gainLoss >= 0 ? "+" : ""}$${gainLoss.toFixed(2)} (${gainLoss >
                 {goals.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {goals.slice(0, 4).map((goal) => {
-                      const progress = (goal.current / goal.target) * 100
-                      const isCompleted = goal.current >= goal.target
+                      // Tự động cập nhật tiến độ
+                      let currentProgress = goal.current || 0
+
+                      if (goal.category === "Tổng tài sản") {
+                        currentProgress = totalValue
+                      } else if (goal.category === "Đầu tư") {
+                        currentProgress = totalValue
+                      } else if (goal.category === "Thu nhập thụ động") {
+                        const estimatedYearlyReturn = totalValue * 0.05
+                        currentProgress = estimatedYearlyReturn / 12
+                      }
+
+                      const progress = (currentProgress / goal.target) * 100
+                      const isCompleted = currentProgress >= goal.target
+
                       return (
                         <div key={goal.id} className="p-4 bg-gray-50 rounded-lg">
                           <div className="flex justify-between items-start mb-2">
                             <h4 className="font-medium text-gray-800">{goal.title}</h4>
-                            <Badge variant={isCompleted ? "default" : "secondary"}>
-                              {isCompleted ? "Hoàn thành" : "Đang thực hiện"}
-                            </Badge>
+                            <div className="flex items-center space-x-1">
+                              <Badge variant={isCompleted ? "default" : "secondary"}>
+                                {isCompleted ? "Hoàn thành" : "Đang thực hiện"}
+                              </Badge>
+                              {goal.category === "Tổng tài sản" && <span className="text-blue-500 text-xs">📊</span>}
+                            </div>
                           </div>
                           <div className="flex justify-between text-sm text-gray-600 mb-2">
                             <span>
-                              ${goal.current?.toLocaleString() || "0"} / ${goal.target?.toLocaleString()}
+                              ${currentProgress.toLocaleString()} / ${goal.target?.toLocaleString()}
                             </span>
                             <span>{goal.deadline}</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
-                              className={`h-2 rounded-full ${isCompleted ? "bg-green-500" : "bg-blue-500"}`}
+                              className={`h-2 rounded-full transition-all duration-300 ${isCompleted ? "bg-green-500" : "bg-blue-500"}`}
                               style={{ width: `${Math.min(progress, 100)}%` }}
                             ></div>
                           </div>
@@ -2117,8 +2133,22 @@ Lãi/Lỗ ngay: ${gainLoss >= 0 ? "+" : ""}$${gainLoss.toFixed(2)} (${gainLoss >
                 ) : (
                   <div className="space-y-4">
                     {goals.map((goal) => {
-                      const progress = (goal.current / goal.target) * 100
-                      const isCompleted = goal.current >= goal.target
+                      // Tự động cập nhật tiến độ dựa trên loại mục tiêu
+                      let currentProgress = goal.current || 0
+
+                      if (goal.category === "Tổng tài sản") {
+                        currentProgress = totalValue // Sử dụng tổng giá trị đầu tư
+                      } else if (goal.category === "Đầu tư") {
+                        currentProgress = totalValue // Sử dụng tổng giá trị đầu tư
+                      } else if (goal.category === "Thu nhập thụ động") {
+                        // Có thể tính toán thu nhập ước tính từ cổ tức/lãi suất
+                        const estimatedYearlyReturn = totalValue * 0.05 // Giả sử 5% yearly return
+                        currentProgress = estimatedYearlyReturn / 12 // Thu nhập hàng tháng
+                      }
+                      // Với "Tiết kiệm" thì vẫn dùng giá trị thủ công từ goal.current
+
+                      const progress = (currentProgress / goal.target) * 100
+                      const isCompleted = currentProgress >= goal.target
                       const daysLeft = Math.ceil((new Date(goal.deadline) - new Date()) / (1000 * 60 * 60 * 24))
 
                       return (
@@ -2127,32 +2157,39 @@ Lãi/Lỗ ngay: ${gainLoss >= 0 ? "+" : ""}$${gainLoss.toFixed(2)} (${gainLoss >
                             <div>
                               <h4 className="font-medium text-gray-800 text-lg">{goal.title}</h4>
                               <p className="text-sm text-gray-600 mt-1">{goal.description}</p>
-                              <Badge variant="outline" className="mt-2">
-                                {goal.category}
-                              </Badge>
+                              <div className="flex items-center space-x-2 mt-2">
+                                <Badge variant="outline">{goal.category}</Badge>
+                                {goal.category === "Tổng tài sản" && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    📊 Tự động từ portfolio
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                             <div className="flex space-x-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  const amount = prompt("Thêm tiến độ ($):")
-                                  if (amount) {
-                                    const addAmount = Number.parseFloat(amount)
-                                    if (!isNaN(addAmount)) {
-                                      setGoals(
-                                        goals.map((g) =>
-                                          g.id === goal.id
-                                            ? { ...g, current: Math.min(g.current + addAmount, g.target) }
-                                            : g,
-                                        ),
-                                      )
+                              {goal.category === "Tiết kiệm" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const amount = prompt("Thêm tiến độ ($):")
+                                    if (amount) {
+                                      const addAmount = Number.parseFloat(amount)
+                                      if (!isNaN(addAmount)) {
+                                        setGoals(
+                                          goals.map((g) =>
+                                            g.id === goal.id
+                                              ? { ...g, current: Math.min((g.current || 0) + addAmount, g.target) }
+                                              : g,
+                                          ),
+                                        )
+                                      }
                                     }
-                                  }
-                                }}
-                              >
-                                + Tiến độ
-                              </Button>
+                                  }}
+                                >
+                                  + Tiến độ
+                                </Button>
+                              )}
                               <Button
                                 variant="destructive"
                                 size="sm"
@@ -2169,7 +2206,10 @@ Lãi/Lỗ ngay: ${gainLoss >= 0 ? "+" : ""}$${gainLoss.toFixed(2)} (${gainLoss >
 
                           <div className="flex justify-between text-sm text-gray-600 mb-2">
                             <span>
-                              ${goal.current?.toLocaleString() || "0"} / ${goal.target?.toLocaleString()}
+                              ${currentProgress.toLocaleString()} / ${goal.target?.toLocaleString()}
+                              {goal.category === "Tổng tài sản" && (
+                                <span className="text-blue-600 ml-2">(Cập nhật tự động từ portfolio)</span>
+                              )}
                             </span>
                             <span className={daysLeft > 0 ? "text-blue-600" : "text-red-600"}>
                               {daysLeft > 0 ? `${daysLeft} ngày còn lại` : "Đã quá hạn"}
@@ -2178,7 +2218,7 @@ Lãi/Lỗ ngay: ${gainLoss >= 0 ? "+" : ""}$${gainLoss.toFixed(2)} (${gainLoss >
 
                           <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                             <div
-                              className={`h-3 rounded-full ${isCompleted ? "bg-green-500" : "bg-blue-500"}`}
+                              className={`h-3 rounded-full transition-all duration-300 ${isCompleted ? "bg-green-500" : "bg-blue-500"}`}
                               style={{ width: `${Math.min(progress, 100)}%` }}
                             ></div>
                           </div>
